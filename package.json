@@ -1,0 +1,10 @@
+{
+  "name": "pulseai-backend",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "dependencies": {
+    "@openrouter/sdk": "^0.4.1"
+  }
+}
