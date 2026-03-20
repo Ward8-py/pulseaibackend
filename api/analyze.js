@@ -1,9 +1,4 @@
 // api/analyze.js
-// POST /api/analyze
-// Body: { type: "article", title, description }
-//    or { type: "briefing", headlines: [] }
-// Uses OpenRouter SDK with meta-llama/llama-3.2-3b-instruct:free
-
 import OpenAI from "openai";
 
 export default async function handler(req, res) {
@@ -14,9 +9,16 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).json({ error: "POST only" });
 
   const key = process.env.OPENROUTER_API_KEY;
-  if (!key) return res.status(500).json({ error: "OPENROUTER_API_KEY not configured on server" });
+  if (!key) return res.status(500).json({ error: "OPENROUTER_API_KEY not set" });
 
-  const { type, title, description, headlines } = req.body;
+  // ── Parse body — handles both raw string and pre-parsed object ──
+  let body = req.body;
+  if (typeof body === "string") {
+    try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "Invalid JSON body" }); }
+  }
+  if (!body) return res.status(400).json({ error: "Empty body" });
+
+  const { type, title, description, headlines } = body;
 
   let prompt = "";
   if (type === "article") {
@@ -26,7 +28,7 @@ export default async function handler(req, res) {
 Title: ${title}
 Description: ${description || ""}
 
-Respond with valid JSON only, no markdown, no explanation: {"summary": "...", "sentiment": "bullish|bearish|neutral"}`;
+Respond with valid JSON only, no markdown: {"summary": "...", "sentiment": "bullish|bearish|neutral"}`;
   } else if (type === "briefing") {
     if (!headlines?.length) return res.status(400).json({ error: "Missing headlines" });
     prompt = `You are a senior analyst. Write a 3-sentence executive briefing from these headlines. Plain text only, no markdown, no bullet points.
@@ -37,7 +39,6 @@ Headlines: ${headlines.join("; ")}`;
   }
 
   try {
-    // OpenRouter is OpenAI-compatible — use openai sdk pointed at OpenRouter
     const client = new OpenAI({
       apiKey: key,
       baseURL: "https://openrouter.ai/api/v1",
@@ -55,18 +56,17 @@ Headlines: ${headlines.join("; ")}`;
     });
 
     const text = completion.choices?.[0]?.message?.content?.trim() || "";
+    console.log(`[analyze] type=${type} response:`, text.slice(0, 100));
 
     if (type === "briefing") {
       return res.status(200).json({ briefing: text });
     }
 
-    // Article — parse JSON from model response
+    // Article — parse JSON
     try {
       const clean = text.replace(/```json|```/g, "").trim();
-      const parsed = JSON.parse(clean);
-      return res.status(200).json(parsed);
+      return res.status(200).json(JSON.parse(clean));
     } catch {
-      // If JSON parse fails, extract sentiment with regex fallback
       const match = text.match(/\b(bullish|bearish|neutral)\b/i);
       return res.status(200).json({
         summary: text,
@@ -74,7 +74,7 @@ Headlines: ${headlines.join("; ")}`;
       });
     }
   } catch (err) {
-    console.error("analyze.js error:", err);
+    console.error("[analyze] error:", err.message);
     return res.status(500).json({ error: "OpenRouter request failed", detail: err.message });
   }
 }
