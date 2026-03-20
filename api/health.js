@@ -6,7 +6,7 @@ export default function handler(req, res) {
       newsapi:  !!process.env.NEWS_API_KEY,
       groq:     !!process.env.GROQ_API_KEY,
     },
-    model: "llama3-8b-8192",
+    model: "llama-3.3-70b-versatile",
     timestamp: new Date().toISOString(),
   });
 }

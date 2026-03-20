@@ -13,7 +13,7 @@ export default async function handler(req, res) {
         "Authorization": `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: "Say the word OK and nothing else." }],
         max_tokens: 5,
         temperature: 0,

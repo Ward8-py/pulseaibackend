@@ -61,7 +61,7 @@ Respond with valid JSON only — no markdown, no explanation:
         "Authorization": `Bearer ${key}`,
       },
       body: JSON.stringify({
-        model: "llama3-8b-8192",
+        model: "llama-3.3-70b-versatile",
         messages: [{ role: "user", content: prompt }],
         max_tokens: type === "briefing" ? 200 : 150,
         temperature: 0.3,
