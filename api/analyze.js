@@ -1,5 +1,4 @@
-// api/analyze.js
-import OpenAI from "openai";
+// api/analyze.js — no npm dependencies, uses plain fetch to OpenRouter
 
 export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -11,10 +10,10 @@ export default async function handler(req, res) {
   const key = process.env.OPENROUTER_API_KEY;
   if (!key) return res.status(500).json({ error: "OPENROUTER_API_KEY not set" });
 
-  // ── Parse body — handles both raw string and pre-parsed object ──
+  // Parse body safely
   let body = req.body;
   if (typeof body === "string") {
-    try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "Invalid JSON body" }); }
+    try { body = JSON.parse(body); } catch { return res.status(400).json({ error: "Invalid JSON" }); }
   }
   if (!body) return res.status(400).json({ error: "Empty body" });
 
@@ -35,34 +34,41 @@ Respond with valid JSON only, no markdown: {"summary": "...", "sentiment": "bull
 
 Headlines: ${headlines.join("; ")}`;
   } else {
-    return res.status(400).json({ error: "type must be 'article' or 'briefing'" });
+    return res.status(400).json({ error: "type must be article or briefing" });
   }
 
   try {
-    const client = new OpenAI({
-      apiKey: key,
-      baseURL: "https://openrouter.ai/api/v1",
-      defaultHeaders: {
+    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${key}`,
         "HTTP-Referer": "https://pulseai.vercel.app",
         "X-Title": "PulseAI",
       },
+      body: JSON.stringify({
+        model: "meta-llama/llama-3.2-3b-instruct:free",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: type === "briefing" ? 200 : 150,
+        temperature: 0.3,
+      }),
     });
 
-    const completion = await client.chat.completions.create({
-      model: "meta-llama/llama-3.2-3b-instruct:free",
-      messages: [{ role: "user", content: prompt }],
-      max_tokens: type === "briefing" ? 200 : 150,
-      temperature: 0.3,
-    });
+    if (!r.ok) {
+      const err = await r.text();
+      console.error("[analyze] OpenRouter error:", err);
+      return res.status(502).json({ error: "OpenRouter error", detail: err });
+    }
 
-    const text = completion.choices?.[0]?.message?.content?.trim() || "";
-    console.log(`[analyze] type=${type} response:`, text.slice(0, 100));
+    const data = await r.json();
+    const text = data.choices?.[0]?.message?.content?.trim() || "";
+    console.log("[analyze] type:", type, "| response:", text.slice(0, 120));
 
     if (type === "briefing") {
       return res.status(200).json({ briefing: text });
     }
 
-    // Article — parse JSON
+    // Article — parse JSON response
     try {
       const clean = text.replace(/```json|```/g, "").trim();
       return res.status(200).json(JSON.parse(clean));
@@ -74,7 +80,7 @@ Headlines: ${headlines.join("; ")}`;
       });
     }
   } catch (err) {
-    console.error("[analyze] error:", err.message);
-    return res.status(500).json({ error: "OpenRouter request failed", detail: err.message });
+    console.error("[analyze] fetch error:", err.message);
+    return res.status(500).json({ error: "Failed to contact OpenRouter", detail: err.message });
   }
 }
