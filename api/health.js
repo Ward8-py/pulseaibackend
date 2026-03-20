@@ -8,7 +8,7 @@ export default function handler(req, res) {
       newsapi:    !!process.env.NEWS_API_KEY,
       openrouter: !!process.env.OPENROUTER_API_KEY,
     },
-    model: "meta-llama/llama-3.2-3b-instruct:free",
+    model: "nvidia/nemotron-3-super-120b-a12b:free",
     timestamp: new Date().toISOString(),
   });
 }

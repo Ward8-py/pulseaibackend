@@ -47,7 +47,7 @@ Headlines: ${headlines.join("; ")}`;
         "X-Title": "PulseAI",
       },
       body: JSON.stringify({
-        model: "meta-llama/llama-3.2-3b-instruct:free",
+        model: "nvidia/nemotron-3-super-120b-a12b:free",
         messages: [{ role: "user", content: prompt }],
         max_tokens: type === "briefing" ? 200 : 150,
         temperature: 0.3,
